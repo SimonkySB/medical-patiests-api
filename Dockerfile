@@ -15,7 +15,7 @@ WORKDIR /app
 
 
 COPY --from=builder /app/target/*.jar app.jar
-
+COPY Wallet_LLWLBZ7KFC99X64K ./Wallet_LLWLBZ7KFC99X64K
 
 EXPOSE 8081
 
