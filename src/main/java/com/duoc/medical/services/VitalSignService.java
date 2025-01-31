@@ -57,4 +57,13 @@ public class VitalSignService {
     public void delete(Long id) {
         vitalSignRepository.deleteById(id);
     }
+
+
+    public List<VitalSign> findVitalSignsWithHistNullOrFalse() {
+        return vitalSignRepository.findVitalSignsWithHistNullOrFalse();
+    }
+
+    public void updateHistToTrue(List<Long> ids) {
+        vitalSignRepository.updateHistToTrue(ids);
+    }
 }
