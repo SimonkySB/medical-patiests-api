@@ -15,8 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.duoc.medical.models.Patient;
 import com.duoc.medical.models.VitalSign;
+import com.duoc.medical.models.VitalSignAlertMessage;
+import com.duoc.medical.models.VitalSignLevel;
 import com.duoc.medical.services.PatientService;
+import com.duoc.medical.services.RabbitProducerService;
 import com.duoc.medical.services.VitalSignService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/api/patients")
@@ -27,6 +31,9 @@ public class PatientController {
 
     @Autowired
     private VitalSignService vitalSignService;
+
+    @Autowired
+    private RabbitProducerService rabbitService;
 
 
 
@@ -77,9 +84,48 @@ public class PatientController {
         if(patient.isEmpty()){
             return ResponseEntity.notFound().build();
         }
-        vitalSign.setPatientId(id);
+        vitalSign.setPatient(patient.get());
+        vitalSign.setHist(false);
         return ResponseEntity.ok(vitalSignService.add(vitalSign));
+    }    
+
+
+    @PostMapping("/{id}/vital-signs-mq")
+    public ResponseEntity<VitalSign> addVitalSignMq(@PathVariable Long id, @RequestBody VitalSign vitalSign) {
+        var patientOptional  = patientService.getById(id);
+        if(patientOptional .isEmpty()){
+            return ResponseEntity.notFound().build();
+        }
+        
+        var patient = patientOptional.get();
+        vitalSign.setPatient(patient);
+        vitalSign.setHist(false);
+        vitalSign = vitalSignService.add(vitalSign);
+
+
+        var level = vitalSign.getVitalSignLevel();
+        if(level != VitalSignLevel.NORMAL) {
+            try {
+                var alert = new VitalSignAlertMessage();
+
+                alert.setPatientId(patient.getId());
+                alert.setPatientName(patient.getFirstName() + ' ' + patient.getLastName());
+                alert.setField(vitalSign.getType().toString());
+                alert.setValue(vitalSign.getValue());
+                alert.setUnit(vitalSign.getUnit());
+                alert.setLevel(level.toString());
+                alert.setVitalSignId(vitalSign.getId());
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                String jsonMessage = objectMapper.writeValueAsString(alert);
+
+                rabbitService.sendAlert(jsonMessage);
+            } catch(Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        return ResponseEntity.ok(vitalSign);
     }
-    
     
 }
